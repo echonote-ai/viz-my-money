@@ -1,8 +1,10 @@
+import { useState, useMemo } from "react";
 import { Transaction } from "@/pages/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
-import { TrendingDown, TrendingUp, DollarSign } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Sector } from "recharts";
+import { TrendingDown, TrendingUp, DollarSign, ChevronLeft, ChevronRight } from "lucide-react";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addWeeks, addMonths, subWeeks, subMonths, isWithinInterval } from "date-fns";
 
 interface ChartSectionProps {
   transactions: Transaction[];
@@ -18,41 +20,157 @@ const COLORS = [
 ];
 
 const ChartSection = ({ transactions }: ChartSectionProps) => {
-  const totalIncome = transactions.reduce((sum, t) => sum + (t.income || 0), 0);
-  const totalExpense = transactions.reduce((sum, t) => sum + (t.expense || 0), 0);
+  const [timePeriod, setTimePeriod] = useState<"weekly" | "monthly">("monthly");
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<"category" | "subcategory">("category");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
+
+  const dateRange = useMemo(() => {
+    if (timePeriod === "weekly") {
+      return {
+        start: startOfWeek(currentDate, { weekStartsOn: 0 }),
+        end: endOfWeek(currentDate, { weekStartsOn: 0 }),
+      };
+    } else {
+      return {
+        start: startOfMonth(currentDate),
+        end: endOfMonth(currentDate),
+      };
+    }
+  }, [timePeriod, currentDate]);
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((t) => {
+      const transactionDate = new Date(t.date);
+      return isWithinInterval(transactionDate, dateRange);
+    });
+  }, [transactions, dateRange]);
+
+  const handlePrevious = () => {
+    if (timePeriod === "weekly") {
+      setCurrentDate(subWeeks(currentDate, 1));
+    } else {
+      setCurrentDate(subMonths(currentDate, 1));
+    }
+  };
+
+  const handleNext = () => {
+    if (timePeriod === "weekly") {
+      setCurrentDate(addWeeks(currentDate, 1));
+    } else {
+      setCurrentDate(addMonths(currentDate, 1));
+    }
+  };
+
+  const totalIncome = filteredTransactions.reduce((sum, t) => sum + (t.income || 0), 0);
+  const totalExpense = filteredTransactions.reduce((sum, t) => sum + (t.expense || 0), 0);
   const netBalance = totalIncome - totalExpense;
 
-  // Group by category
-  const categoryData = transactions.reduce((acc, t) => {
-    if (t.expense > 0) {
-      const existing = acc.find((item) => item.name === t.category);
-      if (existing) {
-        existing.value += t.expense;
-      } else {
-        acc.push({ name: t.category, value: t.expense });
+  const categoryData = useMemo(() => {
+    const grouped: Record<string, number> = {};
+    filteredTransactions.forEach((t) => {
+      if (t.expense > 0) {
+        grouped[t.category] = (grouped[t.category] || 0) + t.expense;
       }
-    }
-    return acc;
-  }, [] as { name: string; value: number }[]);
+    });
+    return Object.entries(grouped)
+      .map(([name, value]) => ({
+        name,
+        value: Number(value.toFixed(2)),
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredTransactions]);
 
-  // Group by subcategory
-  const subcategoryData = transactions.reduce((acc, t) => {
-    if (t.expense > 0 && t.subcategory) {
-      const existing = acc.find((item) => item.name === t.subcategory);
-      if (existing) {
-        existing.value += t.expense;
-      } else {
-        acc.push({ name: t.subcategory, value: t.expense });
+  const subcategoryData = useMemo(() => {
+    const grouped: Record<string, number> = {};
+    const transactionsToUse = selectedCategory
+      ? filteredTransactions.filter((t) => t.category === selectedCategory)
+      : filteredTransactions;
+    
+    transactionsToUse.forEach((t) => {
+      if (t.expense > 0 && t.subcategory) {
+        grouped[t.subcategory] = (grouped[t.subcategory] || 0) + t.expense;
       }
-    }
-    return acc;
-  }, [] as { name: string; value: number }[]);
+    });
+    return Object.entries(grouped)
+      .map(([name, value]) => ({
+        name,
+        value: Number(value.toFixed(2)),
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredTransactions, selectedCategory]);
 
-  // Top expenses
-  const topExpenses = [...categoryData].sort((a, b) => b.value - a.value).slice(0, 5);
+  const renderActiveShape = (props: any) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+    
+    return (
+      <g>
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius + 10}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+        />
+      </g>
+    );
+  };
+
+  const handlePieClick = (entry: any) => {
+    if (viewMode === "category") {
+      setSelectedCategory(entry.name);
+      setViewMode("subcategory");
+      setActiveIndex(undefined);
+    }
+  };
+
+  const handleBackToCategories = () => {
+    setViewMode("category");
+    setSelectedCategory(null);
+    setActiveIndex(undefined);
+  };
+
+  const currentData = viewMode === "category" ? categoryData : subcategoryData;
 
   return (
     <div className="space-y-6">
+      {/* Time Period Controls */}
+      <Card className="p-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex gap-2">
+            <Button
+              variant={timePeriod === "weekly" ? "default" : "outline"}
+              onClick={() => setTimePeriod("weekly")}
+              size="sm"
+            >
+              Weekly
+            </Button>
+            <Button
+              variant={timePeriod === "monthly" ? "default" : "outline"}
+              onClick={() => setTimePeriod("monthly")}
+              size="sm"
+            >
+              Monthly
+            </Button>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={handlePrevious}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="text-sm font-medium min-w-[200px] text-center">
+              {format(dateRange.start, "MMM d, yyyy")} - {format(dateRange.end, "MMM d, yyyy")}
+            </div>
+            <Button variant="outline" size="icon" onClick={handleNext}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-gradient-to-br from-card to-muted/20 border-0 shadow-md">
@@ -99,90 +217,77 @@ const ChartSection = ({ transactions }: ChartSectionProps) => {
       </div>
 
       {/* Charts */}
-      <Tabs defaultValue="category" className="space-y-4">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="category">By Category</TabsTrigger>
-          <TabsTrigger value="subcategory">By Subcategory</TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>
+              {viewMode === "category" ? "Expense Distribution" : `Subcategories: ${selectedCategory || "All"}`}
+            </CardTitle>
+            {viewMode === "subcategory" && (
+              <Button variant="outline" size="sm" onClick={handleBackToCategories}>
+                Back
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={currentData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => {
+                    if (percent < 0.05) return null;
+                    const displayName = name.length > 8 ? name.substring(0, 8) + '...' : name;
+                    return `${displayName} ${(percent * 100).toFixed(0)}%`;
+                  }}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                  activeIndex={activeIndex}
+                  activeShape={renderActiveShape}
+                  onMouseEnter={(_, index) => setActiveIndex(index)}
+                  onMouseLeave={() => setActiveIndex(undefined)}
+                  onClick={viewMode === "category" ? handlePieClick : undefined}
+                  style={{ cursor: viewMode === "category" ? "pointer" : "default" }}
+                >
+                  {currentData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="category" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="shadow-md">
-              <CardHeader>
-                <CardTitle>Expense Distribution</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {categoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-md">
-              <CardHeader>
-                <CardTitle>Top 5 Categories</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={topExpenses}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" tick={{ fill: 'hsl(var(--foreground))' }} />
-                    <YAxis tick={{ fill: 'hsl(var(--foreground))' }} />
-                    <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="subcategory" className="space-y-4">
-          <Card className="shadow-md">
-            <CardHeader>
-              <CardTitle>Subcategory Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <PieChart>
-                  <Pie
-                    data={subcategoryData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                    outerRadius={120}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {subcategoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        <Card className="shadow-md">
+          <CardHeader>
+            <CardTitle>
+              {viewMode === "category" ? "Top Categories" : "Top Subcategories"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={currentData.slice(0, 10)}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="name" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                  interval={0}
+                  tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }}
+                />
+                <YAxis tick={{ fill: 'hsl(var(--foreground))' }} />
+                <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

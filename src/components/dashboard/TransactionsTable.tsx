@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format, parseISO } from "date-fns";
 import { Transaction } from "@/pages/Dashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -138,7 +139,7 @@ const TransactionsTable = ({ transactions, onUpdate }: TransactionsTableProps) =
                   displayedTransactions.map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell className="font-medium">
-                        {new Date(transaction.date).toLocaleDateString()}
+                        {format(parseISO(transaction.date), "MM/dd/yyyy")}
                       </TableCell>
                       <TableCell>{transaction.category}</TableCell>
                       <TableCell>{transaction.subcategory || "-"}</TableCell>

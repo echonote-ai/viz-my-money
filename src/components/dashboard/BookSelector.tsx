@@ -16,15 +16,26 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BookOpen, Plus } from "lucide-react";
+import { BookOpen, Plus, Trash2 } from "lucide-react";
 
 interface BookSelectorProps {
   books: Book[];
   selectedBook: Book | null;
   onSelectBook: (book: Book) => void;
   onCreateBook: (name: string, currency: string) => void;
+  onDeleteBook: (bookId: string) => void;
 }
 
 const BookSelector = ({
@@ -32,8 +43,10 @@ const BookSelector = ({
   selectedBook,
   onSelectBook,
   onCreateBook,
+  onDeleteBook,
 }: BookSelectorProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [newBookName, setNewBookName] = useState("");
   const [newBookCurrency, setNewBookCurrency] = useState("USD");
 
@@ -43,6 +56,13 @@ const BookSelector = ({
       setNewBookName("");
       setNewBookCurrency("USD");
       setIsDialogOpen(false);
+    }
+  };
+
+  const handleDelete = () => {
+    if (selectedBook) {
+      onDeleteBook(selectedBook.id);
+      setIsDeleteDialogOpen(false);
     }
   };
 
@@ -61,24 +81,37 @@ const BookSelector = ({
         
         <div className="flex items-center gap-3">
           {books.length > 0 && (
-            <Select
-              value={selectedBook?.id || ""}
-              onValueChange={(value) => {
-                const book = books.find((b) => b.id === value);
-                if (book) onSelectBook(book);
-              }}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select a book" />
-              </SelectTrigger>
-              <SelectContent>
-                {books.map((book) => (
-                  <SelectItem key={book.id} value={book.id}>
-                    {book.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <>
+              <Select
+                value={selectedBook?.id || ""}
+                onValueChange={(value) => {
+                  const book = books.find((b) => b.id === value);
+                  if (book) onSelectBook(book);
+                }}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select a book" />
+                </SelectTrigger>
+                <SelectContent>
+                  {books.map((book) => (
+                    <SelectItem key={book.id} value={book.id}>
+                      {book.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {selectedBook && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </>
           )}
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -129,6 +162,23 @@ const BookSelector = ({
           </Dialog>
         </div>
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Book?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{selectedBook?.name}"? This will permanently delete all transactions in this book. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -144,6 +144,38 @@ const Dashboard = () => {
     }
   };
 
+  const handleDeleteBook = async (bookId: string) => {
+    try {
+      // Delete all transactions first
+      const { error: transactionsError } = await supabase
+        .from("transactions")
+        .delete()
+        .eq("book_id", bookId);
+
+      if (transactionsError) throw transactionsError;
+
+      // Then delete the book
+      const { error: bookError } = await supabase
+        .from("books")
+        .delete()
+        .eq("id", bookId);
+
+      if (bookError) throw bookError;
+
+      // Update local state
+      const updatedBooks = books.filter((b) => b.id !== bookId);
+      setBooks(updatedBooks);
+      
+      if (selectedBook?.id === bookId) {
+        setSelectedBook(updatedBooks.length > 0 ? updatedBooks[0] : null);
+      }
+      
+      toast.success("Book deleted successfully!");
+    } catch (error: any) {
+      toast.error("Failed to delete book");
+    }
+  };
+
   const handleUploadComplete = () => {
     if (selectedBook) {
       loadTransactions(selectedBook.id);
@@ -171,6 +203,7 @@ const Dashboard = () => {
           selectedBook={selectedBook}
           onSelectBook={setSelectedBook}
           onCreateBook={handleCreateBook}
+          onDeleteBook={handleDeleteBook}
         />
 
         {selectedBook && (

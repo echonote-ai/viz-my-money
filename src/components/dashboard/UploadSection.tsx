@@ -15,27 +15,89 @@ const UploadSection = ({ bookId, userId, onUploadComplete }: UploadSectionProps)
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const parseNumber = (value: string): number => {
+    if (!value) return 0;
+    // Remove commas and parse
+    const cleaned = value.replace(/,/g, '');
+    return parseFloat(cleaned) || 0;
+  };
+
+  const normalizeDate = (dateStr: string): string => {
+    if (!dateStr) return '';
+    
+    // Try to parse different date formats
+    const cleaned = dateStr.trim();
+    
+    // Format: YYYY/MM/DD or YYYY-MM-DD
+    if (/^\d{4}[/-]\d{1,2}[/-]\d{1,2}$/.test(cleaned)) {
+      return cleaned.replace(/\//g, '-');
+    }
+    
+    // Format: MM/DD/YYYY or MM-DD-YYYY
+    if (/^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(cleaned)) {
+      const parts = cleaned.split(/[/-]/);
+      return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+    }
+    
+    return cleaned;
+  };
+
   const parseCSV = (text: string): any[] => {
     const lines = text.trim().split("\n");
-    const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
+    const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
     
     const transactions = [];
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(",");
+      const values = parseCSVLine(lines[i]);
       if (values.length < 3) continue;
 
       const transaction: any = {};
       headers.forEach((header, index) => {
-        const value = values[index]?.trim() || "";
+        const value = values[index] || "";
         
-        // Map common header variations
-        if (header.includes("date")) transaction.date = value;
-        else if (header.includes("category") && !header.includes("sub")) transaction.category = value;
-        else if (header.includes("subcategory") || header.includes("sub")) transaction.subcategory = value;
-        else if (header.includes("income")) transaction.income = parseFloat(value) || 0;
-        else if (header.includes("expense")) transaction.expense = parseFloat(value) || 0;
-        else if (header.includes("note") || header.includes("description")) transaction.note = value;
-        else if (header.includes("paid")) transaction.paid_from = value;
+        // Map headers (English and Chinese)
+        if (header.includes("date") || header === "date") {
+          transaction.date = normalizeDate(value);
+        }
+        else if (header.includes("category") && !header.includes("sub")) {
+          transaction.category = value;
+        }
+        else if (header.includes("subcategory") || header.includes("sub")) {
+          transaction.subcategory = value;
+        }
+        else if (header.includes("income")) {
+          transaction.income = parseNumber(value);
+        }
+        else if (header.includes("expense")) {
+          transaction.expense = parseNumber(value);
+        }
+        else if (header.includes("note") || header.includes("description")) {
+          transaction.note = value;
+        }
+        else if (header.includes("paid")) {
+          transaction.paid_from = value;
+        }
       });
 
       if (transaction.date && transaction.category) {

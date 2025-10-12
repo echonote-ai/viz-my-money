@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Sector } from "recharts";
 import { TrendingDown, TrendingUp, DollarSign, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addWeeks, addMonths, subWeeks, subMonths, isWithinInterval } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addWeeks, addMonths, addYears, subWeeks, subMonths, subYears, isWithinInterval } from "date-fns";
 
 interface ChartSectionProps {
   transactions: Transaction[];
+  onFilterChange: (filtered: Transaction[]) => void;
 }
 
 const COLORS = [
@@ -19,8 +20,8 @@ const COLORS = [
   "hsl(var(--chart-6))",
 ];
 
-const ChartSection = ({ transactions }: ChartSectionProps) => {
-  const [timePeriod, setTimePeriod] = useState<"weekly" | "monthly">("monthly");
+const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
+  const [timePeriod, setTimePeriod] = useState<"weekly" | "monthly" | "yearly">("monthly");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"category" | "subcategory">("category");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -32,34 +33,49 @@ const ChartSection = ({ transactions }: ChartSectionProps) => {
         start: startOfWeek(currentDate, { weekStartsOn: 0 }),
         end: endOfWeek(currentDate, { weekStartsOn: 0 }),
       };
-    } else {
+    } else if (timePeriod === "monthly") {
       return {
         start: startOfMonth(currentDate),
         end: endOfMonth(currentDate),
+      };
+    } else {
+      return {
+        start: startOfYear(currentDate),
+        end: endOfYear(currentDate),
       };
     }
   }, [timePeriod, currentDate]);
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((t) => {
+    const filtered = transactions.filter((t) => {
       const transactionDate = new Date(t.date);
       return isWithinInterval(transactionDate, dateRange);
     });
+    return filtered;
   }, [transactions, dateRange]);
+
+  // Notify parent of filtered transactions
+  useMemo(() => {
+    onFilterChange(filteredTransactions);
+  }, [filteredTransactions, onFilterChange]);
 
   const handlePrevious = () => {
     if (timePeriod === "weekly") {
       setCurrentDate(subWeeks(currentDate, 1));
-    } else {
+    } else if (timePeriod === "monthly") {
       setCurrentDate(subMonths(currentDate, 1));
+    } else {
+      setCurrentDate(subYears(currentDate, 1));
     }
   };
 
   const handleNext = () => {
     if (timePeriod === "weekly") {
       setCurrentDate(addWeeks(currentDate, 1));
-    } else {
+    } else if (timePeriod === "monthly") {
       setCurrentDate(addMonths(currentDate, 1));
+    } else {
+      setCurrentDate(addYears(currentDate, 1));
     }
   };
 
@@ -154,6 +170,13 @@ const ChartSection = ({ transactions }: ChartSectionProps) => {
               size="sm"
             >
               Monthly
+            </Button>
+            <Button
+              variant={timePeriod === "yearly" ? "default" : "outline"}
+              onClick={() => setTimePeriod("yearly")}
+              size="sm"
+            >
+              Yearly
             </Button>
           </div>
           

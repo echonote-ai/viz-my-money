@@ -38,6 +38,7 @@ const Dashboard = () => {
   const [books, setBooks] = useState<Book[]>([]);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -216,9 +217,12 @@ const Dashboard = () => {
 
             {transactions.length > 0 && (
               <>
-                <ChartSection transactions={transactions} />
+                <ChartSection 
+                  transactions={transactions} 
+                  onFilterChange={setFilteredTransactions}
+                />
                 <TransactionsTable
-                  transactions={transactions}
+                  transactions={filteredTransactions}
                   onUpdate={handleUploadComplete}
                 />
               </>

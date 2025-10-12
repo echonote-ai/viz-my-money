@@ -31,6 +31,7 @@ interface TransactionsTableProps {
 const TransactionsTable = ({ transactions, onUpdate }: TransactionsTableProps) => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [formData, setFormData] = useState<Partial<Transaction>>({});
+  const [itemsPerPage, setItemsPerPage] = useState(50);
 
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
@@ -78,11 +79,39 @@ const TransactionsTable = ({ transactions, onUpdate }: TransactionsTableProps) =
     }
   };
 
+  const displayedTransactions = transactions.slice(0, itemsPerPage);
+
   return (
     <>
       <Card className="shadow-md">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Transactions</CardTitle>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Show:</span>
+            <div className="flex gap-1">
+              <Button
+                variant={itemsPerPage === 50 ? "default" : "outline"}
+                size="sm"
+                onClick={() => setItemsPerPage(50)}
+              >
+                50
+              </Button>
+              <Button
+                variant={itemsPerPage === 100 ? "default" : "outline"}
+                size="sm"
+                onClick={() => setItemsPerPage(100)}
+              >
+                100
+              </Button>
+              <Button
+                variant={itemsPerPage === 150 ? "default" : "outline"}
+                size="sm"
+                onClick={() => setItemsPerPage(150)}
+              >
+                150
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -99,48 +128,56 @@ const TransactionsTable = ({ transactions, onUpdate }: TransactionsTableProps) =
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.slice(0, 50).map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell className="font-medium">
-                      {new Date(transaction.date).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>{transaction.category}</TableCell>
-                    <TableCell>{transaction.subcategory || "-"}</TableCell>
-                    <TableCell className="text-right text-primary font-medium">
-                      {transaction.income > 0 ? `$${transaction.income.toFixed(2)}` : "-"}
-                    </TableCell>
-                    <TableCell className="text-right text-secondary font-medium">
-                      {transaction.expense > 0 ? `$${transaction.expense.toFixed(2)}` : "-"}
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {transaction.note || "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(transaction)}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(transaction.id)}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
+                {displayedTransactions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                      No transactions found for this period
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  displayedTransactions.map((transaction) => (
+                    <TableRow key={transaction.id}>
+                      <TableCell className="font-medium">
+                        {new Date(transaction.date).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>{transaction.category}</TableCell>
+                      <TableCell>{transaction.subcategory || "-"}</TableCell>
+                      <TableCell className="text-right text-primary font-medium">
+                        {transaction.income > 0 ? `$${transaction.income.toFixed(2)}` : "-"}
+                      </TableCell>
+                      <TableCell className="text-right text-secondary font-medium">
+                        {transaction.expense > 0 ? `$${transaction.expense.toFixed(2)}` : "-"}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {transaction.note || "-"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(transaction)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(transaction.id)}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
-          {transactions.length > 50 && (
+          {transactions.length > 0 && (
             <p className="text-sm text-muted-foreground text-center mt-4">
-              Showing 50 of {transactions.length} transactions
+              Showing {displayedTransactions.length} of {transactions.length} transactions
             </p>
           )}
         </CardContent>

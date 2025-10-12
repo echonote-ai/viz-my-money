@@ -51,13 +51,20 @@ const UploadSection = ({ bookId, userId, onUploadComplete }: UploadSectionProps)
     
     // Format: YYYY/MM/DD or YYYY-MM-DD
     if (/^\d{4}[/-]\d{1,2}[/-]\d{1,2}$/.test(cleaned)) {
-      return cleaned.replace(/\//g, '-');
+      const parts = cleaned.split(/[/-]/);
+      const year = parts[0];
+      const month = parts[1].padStart(2, '0');
+      const day = parts[2].padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
     
     // Format: MM/DD/YYYY or MM-DD-YYYY
     if (/^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(cleaned)) {
       const parts = cleaned.split(/[/-]/);
-      return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+      const year = parts[2];
+      const month = parts[0].padStart(2, '0');
+      const day = parts[1].padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
     
     return cleaned;

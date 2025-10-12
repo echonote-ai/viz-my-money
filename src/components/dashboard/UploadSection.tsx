@@ -132,10 +132,40 @@ const UploadSection = ({ bookId, userId, onUploadComplete }: UploadSectionProps)
 
       if (parsedTransactions.length === 0) {
         toast.error("No valid transactions found in CSV");
+        setIsUploading(false);
         return;
       }
 
-      const transactionsToInsert = parsedTransactions.map((t) => ({
+      // Fetch existing transactions for this book to check for duplicates
+      const { data: existingTransactions, error: fetchError } = await supabase
+        .from("transactions")
+        .select("date, category, subcategory, income, expense, note")
+        .eq("book_id", bookId);
+
+      if (fetchError) throw fetchError;
+
+      // Create a Set of existing transaction signatures for fast lookup
+      const existingSignatures = new Set(
+        (existingTransactions || []).map((t) =>
+          `${t.date}|${t.category}|${t.subcategory || ''}|${t.income}|${t.expense}|${t.note || ''}`
+        )
+      );
+
+      // Filter out duplicates
+      const newTransactions = parsedTransactions.filter((t) => {
+        const signature = `${t.date}|${t.category}|${t.subcategory || ''}|${t.income}|${t.expense}|${t.note || ''}`;
+        return !existingSignatures.has(signature);
+      });
+
+      const duplicateCount = parsedTransactions.length - newTransactions.length;
+
+      if (newTransactions.length === 0) {
+        toast.info("All transactions are duplicates. Nothing to import.");
+        setIsUploading(false);
+        return;
+      }
+
+      const transactionsToInsert = newTransactions.map((t) => ({
         book_id: bookId,
         user_id: userId,
         date: t.date,
@@ -154,7 +184,11 @@ const UploadSection = ({ bookId, userId, onUploadComplete }: UploadSectionProps)
 
       if (error) throw error;
 
-      toast.success(`Successfully uploaded ${parsedTransactions.length} transactions`);
+      const message = duplicateCount > 0
+        ? `Successfully uploaded ${newTransactions.length} transactions (${duplicateCount} duplicates skipped)`
+        : `Successfully uploaded ${newTransactions.length} transactions`;
+      
+      toast.success(message);
       onUploadComplete();
       
       if (fileInputRef.current) {

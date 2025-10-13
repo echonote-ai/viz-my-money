@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Sector } from "recharts";
 import { TrendingDown, TrendingUp, DollarSign, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addWeeks, addMonths, addYears, subWeeks, subMonths, subYears, isWithinInterval } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addWeeks, addMonths, addYears, subWeeks, subMonths, subYears, parseISO, startOfDay, endOfDay } from "date-fns";
 
 interface ChartSectionProps {
   transactions: Transaction[];
@@ -48,8 +48,10 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
 
   const filteredTransactions = useMemo(() => {
     const filtered = transactions.filter((t) => {
-      const transactionDate = new Date(t.date);
-      return isWithinInterval(transactionDate, dateRange);
+      const transactionDate = startOfDay(parseISO(t.date));
+      const rangeStart = startOfDay(dateRange.start);
+      const rangeEnd = endOfDay(dateRange.end);
+      return transactionDate >= rangeStart && transactionDate <= rangeEnd;
     });
     return filtered;
   }, [transactions, dateRange]);
@@ -116,6 +118,73 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
       }))
       .sort((a, b) => b.value - a.value);
   }, [filteredTransactions, selectedCategory]);
+
+  // Monthly expense data for bar chart
+  const monthlyData = useMemo(() => {
+    if (timePeriod !== "monthly") return [];
+    
+    const monthlyExpenses: Record<string, Record<string, number>> = {};
+    
+    // Group expenses by month and category
+    transactions.forEach((t) => {
+      if (t.expense > 0) {
+        const month = format(parseISO(t.date), "MMM yyyy");
+        if (!monthlyExpenses[month]) {
+          monthlyExpenses[month] = {};
+        }
+        monthlyExpenses[month][t.category] = (monthlyExpenses[month][t.category] || 0) + t.expense;
+      }
+    });
+
+    // Convert to array format for chart
+    return Object.entries(monthlyExpenses)
+      .map(([month, categories]) => ({
+        month,
+        total: Object.values(categories).reduce((sum, val) => sum + val, 0),
+        categories,
+      }))
+      .sort((a, b) => {
+        const dateA = new Date(a.month);
+        const dateB = new Date(b.month);
+        return dateA.getTime() - dateB.getTime();
+      });
+  }, [transactions, timePeriod]);
+
+  // Custom tooltip for pie chart showing monthly breakdown
+  const CustomPieTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length > 0) {
+      const category = payload[0].name;
+      const totalValue = payload[0].value;
+      
+      // Calculate monthly breakdown for this category
+      const monthlyBreakdown: Record<string, number> = {};
+      transactions.forEach((t) => {
+        if (t.category === category && t.expense > 0) {
+          const month = format(parseISO(t.date), "MMM yyyy");
+          monthlyBreakdown[month] = (monthlyBreakdown[month] || 0) + t.expense;
+        }
+      });
+
+      return (
+        <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+          <p className="font-semibold text-sm mb-2">{category}</p>
+          <p className="text-sm text-primary font-bold mb-2">Total: ${totalValue.toFixed(2)}</p>
+          <div className="border-t border-border pt-2 mt-2">
+            <p className="text-xs text-muted-foreground mb-1">Monthly Breakdown:</p>
+            {Object.entries(monthlyBreakdown)
+              .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+              .map(([month, amount]) => (
+                <div key={month} className="flex justify-between text-xs gap-4">
+                  <span>{month}:</span>
+                  <span className="font-medium">${amount.toFixed(2)}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   const renderActiveShape = (props: any) => {
     const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
@@ -279,7 +348,7 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                <Tooltip content={<CustomPieTooltip />} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -288,25 +357,42 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle>
-              {viewMode === "category" ? "Top Categories" : "Top Subcategories"}
+              {timePeriod === "monthly" ? "Monthly Expenses" : viewMode === "category" ? "Top Categories" : "Top Subcategories"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={currentData.slice(0, 10)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45}
-                  textAnchor="end"
-                  height={100}
-                  interval={0}
-                  tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }}
-                />
-                <YAxis tick={{ fill: 'hsl(var(--foreground))' }} />
-                <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-              </BarChart>
+              {timePeriod === "monthly" ? (
+                <BarChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="month" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                    interval={0}
+                    tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }}
+                  />
+                  <YAxis tick={{ fill: 'hsl(var(--foreground))' }} />
+                  <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                  <Bar dataKey="total" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              ) : (
+                <BarChart data={currentData.slice(0, 10)}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                    interval={0}
+                    tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }}
+                  />
+                  <YAxis tick={{ fill: 'hsl(var(--foreground))' }} />
+                  <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              )}
             </ResponsiveContainer>
           </CardContent>
         </Card>

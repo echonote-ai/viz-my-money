@@ -146,7 +146,8 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
     // Group expenses by month and category
     transactions.forEach((t) => {
       if (t.expense > 0) {
-        const month = format(parseISO(t.date), "MMM yyyy");
+        const transactionDate = parseISO(t.date);
+        const month = format(transactionDate, "MMM yyyy");
         if (!monthlyExpenses[month]) {
           monthlyExpenses[month] = {};
         }
@@ -154,18 +155,15 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
       }
     });
 
-    // Convert to array format for chart
+    // Convert to array format for chart and sort by date
     return Object.entries(monthlyExpenses)
       .map(([month, categories]) => ({
         month,
-        total: Object.values(categories).reduce((sum, val) => sum + val, 0),
+        total: Number(Object.values(categories).reduce((sum, val) => sum + val, 0).toFixed(2)),
         categories,
+        sortDate: parseISO(`${month} 01`),
       }))
-      .sort((a, b) => {
-        const dateA = new Date(a.month);
-        const dateB = new Date(b.month);
-        return dateA.getTime() - dateB.getTime();
-      });
+      .sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
   }, [transactions, timePeriod]);
 
   // Custom tooltip for pie chart showing monthly breakdown

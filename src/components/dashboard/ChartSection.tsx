@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Transaction } from "@/pages/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,10 +22,28 @@ const COLORS = [
 
 const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
   const [timePeriod, setTimePeriod] = useState<"weekly" | "monthly" | "yearly">("monthly");
-  const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Initialize currentDate to the most recent transaction date, or today if no transactions
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (transactions.length > 0) {
+      const dates = transactions.map(t => parseISO(t.date));
+      return new Date(Math.max(...dates.map(d => d.getTime())));
+    }
+    return new Date();
+  });
+  
   const [viewMode, setViewMode] = useState<"category" | "subcategory">("category");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
+
+  // Update currentDate when transactions change (e.g., after upload)
+  useEffect(() => {
+    if (transactions.length > 0) {
+      const dates = transactions.map(t => parseISO(t.date));
+      const mostRecentDate = new Date(Math.max(...dates.map(d => d.getTime())));
+      setCurrentDate(mostRecentDate);
+    }
+  }, [transactions.length]);
 
   const dateRange = useMemo(() => {
     if (timePeriod === "weekly") {

@@ -66,18 +66,13 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
 
   const filteredTransactions = useMemo(() => {
     const filtered = transactions.filter((t) => {
-      const transactionDate = startOfDay(parseISO(t.date));
+      // Parse the date string as local date (YYYY-MM-DD format from database)
+      const [year, month, day] = t.date.split('-').map(Number);
+      const transactionDate = new Date(year, month - 1, day);
       const rangeStart = startOfDay(dateRange.start);
       const rangeEnd = endOfDay(dateRange.end);
+      
       return transactionDate >= rangeStart && transactionDate <= rangeEnd;
-    });
-    
-    console.log('Date Range:', {
-      start: dateRange.start,
-      end: dateRange.end,
-      totalTransactions: transactions.length,
-      filteredCount: filtered.length,
-      sampleDates: transactions.slice(0, 5).map(t => t.date)
     });
     
     return filtered;

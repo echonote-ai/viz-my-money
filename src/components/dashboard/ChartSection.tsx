@@ -26,7 +26,10 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
   // Initialize currentDate to the most recent transaction date, or today if no transactions
   const [currentDate, setCurrentDate] = useState(() => {
     if (transactions.length > 0) {
-      const dates = transactions.map(t => parseISO(t.date));
+      const dates = transactions.map(t => {
+        const [year, month, day] = t.date.split('-').map(Number);
+        return new Date(year, month - 1, day);
+      });
       return new Date(Math.max(...dates.map(d => d.getTime())));
     }
     return new Date();
@@ -39,7 +42,10 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
   // Update currentDate when transactions change (e.g., after upload)
   useEffect(() => {
     if (transactions.length > 0) {
-      const dates = transactions.map(t => parseISO(t.date));
+      const dates = transactions.map(t => {
+        const [year, month, day] = t.date.split('-').map(Number);
+        return new Date(year, month - 1, day);
+      });
       const mostRecentDate = new Date(Math.max(...dates.map(d => d.getTime())));
       setCurrentDate(mostRecentDate);
     }
@@ -150,12 +156,13 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
     // Use ALL transactions to show monthly trend across entire dataset
     transactions.forEach((t) => {
       if (t.expense > 0) {
-        const transactionDate = parseISO(t.date);
-        const month = format(transactionDate, "MMM yyyy");
-        if (!monthlyExpenses[month]) {
-          monthlyExpenses[month] = {};
+        const [year, month, day] = t.date.split('-').map(Number);
+        const transactionDate = new Date(year, month - 1, day);
+        const monthKey = format(transactionDate, "MMM yyyy");
+        if (!monthlyExpenses[monthKey]) {
+          monthlyExpenses[monthKey] = {};
         }
-        monthlyExpenses[month][t.category] = (monthlyExpenses[month][t.category] || 0) + t.expense;
+        monthlyExpenses[monthKey][t.category] = (monthlyExpenses[monthKey][t.category] || 0) + t.expense;
       }
     });
 
@@ -180,8 +187,10 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
       const monthlyBreakdown: Record<string, number> = {};
       transactions.forEach((t) => {
         if (t.category === category && t.expense > 0) {
-          const month = format(parseISO(t.date), "MMM yyyy");
-          monthlyBreakdown[month] = (monthlyBreakdown[month] || 0) + t.expense;
+          const [year, month, day] = t.date.split('-').map(Number);
+          const transactionDate = new Date(year, month - 1, day);
+          const monthKey = format(transactionDate, "MMM yyyy");
+          monthlyBreakdown[monthKey] = (monthlyBreakdown[monthKey] || 0) + t.expense;
         }
       });
 

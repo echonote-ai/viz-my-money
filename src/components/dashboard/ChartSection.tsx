@@ -38,6 +38,7 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
   const [viewMode, setViewMode] = useState<"category" | "subcategory">("category");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
+  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
 
   // Update currentDate when transactions change (e.g., after upload)
   useEffect(() => {
@@ -172,10 +173,34 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
         month,
         total: Number(Object.values(categories).reduce((sum, val) => sum + val, 0).toFixed(2)),
         categories,
-        sortDate: parseISO(`${month} 01`),
+        sortDate: new Date(month + ' 01'),
       }))
       .sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
   }, [transactions, timePeriod]);
+
+  // Monthly data for hovered category
+  const hoveredCategoryMonthlyData = useMemo(() => {
+    if (!hoveredCategory || timePeriod !== "monthly") return [];
+    
+    const monthlyExpenses: Record<string, number> = {};
+    
+    transactions.forEach((t) => {
+      if (t.expense > 0 && t.category === hoveredCategory) {
+        const [year, month, day] = t.date.split('-').map(Number);
+        const transactionDate = new Date(year, month - 1, day);
+        const monthKey = format(transactionDate, "MMM yyyy");
+        monthlyExpenses[monthKey] = (monthlyExpenses[monthKey] || 0) + t.expense;
+      }
+    });
+
+    return Object.entries(monthlyExpenses)
+      .map(([month, value]) => ({
+        month,
+        value: Number(value.toFixed(2)),
+        sortDate: new Date(month + ' 01'),
+      }))
+      .sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
+  }, [transactions, hoveredCategory, timePeriod]);
 
   // Custom tooltip for pie chart showing monthly breakdown
   const CustomPieTooltip = ({ active, payload }: any) => {
@@ -368,8 +393,14 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
                   dataKey="value"
                   activeIndex={activeIndex}
                   activeShape={renderActiveShape}
-                  onMouseEnter={(_, index) => setActiveIndex(index)}
-                  onMouseLeave={() => setActiveIndex(undefined)}
+                  onMouseEnter={(data, index) => {
+                    setActiveIndex(index);
+                    setHoveredCategory(data.name);
+                  }}
+                  onMouseLeave={() => {
+                    setActiveIndex(undefined);
+                    setHoveredCategory(null);
+                  }}
                   onClick={viewMode === "category" ? handlePieClick : undefined}
                   style={{ cursor: viewMode === "category" ? "pointer" : "default" }}
                 >
@@ -386,26 +417,45 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle>
-              {timePeriod === "monthly" ? "Monthly Expenses" : viewMode === "category" ? "Top Categories" : "Top Subcategories"}
+              {timePeriod === "monthly" 
+                ? (hoveredCategory ? `${hoveredCategory} - Monthly Breakdown` : "Monthly Expenses")
+                : (viewMode === "category" ? "Top Categories" : "Top Subcategories")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               {timePeriod === "monthly" ? (
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="month" 
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                    interval={0}
-                    tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }}
-                  />
-                  <YAxis tick={{ fill: 'hsl(var(--foreground))' }} />
-                  <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-                  <Bar dataKey="total" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-                </BarChart>
+                hoveredCategory ? (
+                  <BarChart data={hoveredCategoryMonthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="month" 
+                      angle={-45}
+                      textAnchor="end"
+                      height={100}
+                      interval={0}
+                      tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }}
+                    />
+                    <YAxis tick={{ fill: 'hsl(var(--foreground))' }} />
+                    <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                    <Bar dataKey="value" fill="hsl(var(--chart-2))" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                ) : (
+                  <BarChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="month" 
+                      angle={-45}
+                      textAnchor="end"
+                      height={100}
+                      interval={0}
+                      tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }}
+                    />
+                    <YAxis tick={{ fill: 'hsl(var(--foreground))' }} />
+                    <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                    <Bar dataKey="total" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                )
               ) : (
                 <BarChart data={currentData.slice(0, 10)}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />

@@ -75,7 +75,7 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
   }, [transactions, dateRange]);
 
   // Notify parent of filtered transactions
-  useMemo(() => {
+  useEffect(() => {
     onFilterChange(filteredTransactions);
   }, [filteredTransactions, onFilterChange]);
 
@@ -137,14 +137,14 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
       .sort((a, b) => b.value - a.value);
   }, [filteredTransactions, selectedCategory]);
 
-  // Monthly expense data for bar chart
+  // Monthly expense data for bar chart - shows ALL months for trend analysis
   const monthlyData = useMemo(() => {
     if (timePeriod !== "monthly") return [];
     
     const monthlyExpenses: Record<string, Record<string, number>> = {};
     
-    // Group expenses by month and category - use all transactions for yearly view
-    filteredTransactions.forEach((t) => {
+    // Use ALL transactions to show monthly trend across entire dataset
+    transactions.forEach((t) => {
       if (t.expense > 0) {
         const transactionDate = parseISO(t.date);
         const month = format(transactionDate, "MMM yyyy");
@@ -164,7 +164,7 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
         sortDate: parseISO(`${month} 01`),
       }))
       .sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
-  }, [filteredTransactions, timePeriod]);
+  }, [transactions, timePeriod]);
 
   // Custom tooltip for pie chart showing monthly breakdown
   const CustomPieTooltip = ({ active, payload }: any) => {

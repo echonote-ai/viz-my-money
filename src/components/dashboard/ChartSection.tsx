@@ -71,6 +71,15 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
       const rangeEnd = endOfDay(dateRange.end);
       return transactionDate >= rangeStart && transactionDate <= rangeEnd;
     });
+    
+    console.log('Date Range:', {
+      start: dateRange.start,
+      end: dateRange.end,
+      totalTransactions: transactions.length,
+      filteredCount: filtered.length,
+      sampleDates: transactions.slice(0, 5).map(t => t.date)
+    });
+    
     return filtered;
   }, [transactions, dateRange]);
 

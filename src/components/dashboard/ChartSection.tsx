@@ -143,8 +143,8 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
     
     const monthlyExpenses: Record<string, Record<string, number>> = {};
     
-    // Group expenses by month and category
-    transactions.forEach((t) => {
+    // Group expenses by month and category - use all transactions for yearly view
+    filteredTransactions.forEach((t) => {
       if (t.expense > 0) {
         const transactionDate = parseISO(t.date);
         const month = format(transactionDate, "MMM yyyy");
@@ -164,7 +164,7 @@ const ChartSection = ({ transactions, onFilterChange }: ChartSectionProps) => {
         sortDate: parseISO(`${month} 01`),
       }))
       .sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
-  }, [transactions, timePeriod]);
+  }, [filteredTransactions, timePeriod]);
 
   // Custom tooltip for pie chart showing monthly breakdown
   const CustomPieTooltip = ({ active, payload }: any) => {
